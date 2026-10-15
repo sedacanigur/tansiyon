@@ -12,26 +12,21 @@
     "run_worker_first": ["/api/*"]
   },
 
-  // Ölçümlerin saklandığı D1 veritabanı.
-  // "npx wrangler d1 create tansiyon" komutunun verdiği database_id'yi aşağıya yapıştırın.
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "tansiyon",
-      "database_id": "BURAYA_DATABASE_ID_YAPISTIRIN"
-    }
-  ],
-
   "vars": {
+    // Notion "Tansiyon Ölçümleri" tablosu (Tansiyon sayfası altında). 15 Ekim 2026'da Notion'dan okundu.
+    "NOTION_DATA_SOURCE_ID": "3fa80c9c-dd9a-80f4-be9c-000bb0d0ebfe",
+    // Notion "Tansiyon Ayarlar" tablosu (uyarı sınırları)
+    "NOTION_SETTINGS_DATA_SOURCE_ID": "f17da2cb-a984-4e25-ab9e-99d7a656cda6",
     // Fotoğraftaki değerleri okuyan Claude modeli. Daha ucuz seçenek: "claude-haiku-5-5"
     "CLAUDE_MODEL": "claude-sonnet-5-5",
     // Tarih/saat gösterimi ve sabah/akşam gruplaması için saat dilimi
     "TIMEZONE": "Europe/Istanbul"
   },
 
-  // Gizli değerler (kodda yazılı değildir, komut satırından girilir):
-  //   npx wrangler secret put APP_PASSWORD        -> uygulamaya giriş şifresi
-  //   npx wrangler secret put ANTHROPIC_API_KEY   -> console.anthropic.com'dan alınan API anahtarı
+  // Gizli değerler (kodda yazılı değildir; Cloudflare → Settings → Variables and Secrets → Type: Secret):
+  //   APP_PASSWORD        uygulamaya giriş şifresi
+  //   NOTION_TOKEN        Notion entegrasyon anahtarı (LGS panelindekiyle aynı olabilir)
+  //   ANTHROPIC_API_KEY   console.anthropic.com'dan alınan API anahtarı
 
   "observability": { "enabled": true }
 }
