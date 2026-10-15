@@ -1,7 +1,7 @@
 {
   // Tansiyon Takip — Cloudflare Workers yapılandırması
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tansiyon-takip",
+  "name": "tansiyon",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
 

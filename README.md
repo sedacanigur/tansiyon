@@ -8,7 +8,7 @@ LGS panelinle aynı yapıda: Cloudflare Workers üzerinde çalışır ve her öl
 - **Tansiyon Ölçümleri:** Her ölçüm bir satırdır. Fotoğraf da satıra eklenir. Satıra şunlar yazılır:
   - tarih ve saat
   - büyük ve küçük tansiyon, nabız
-  - aç/tok durumu
+  - aç/tok durumu ve ölçülen kol (sol/sağ, varsayılan sol)
   - ESH sınıfı
   - konum ve harita bağlantısı
   - dış sıcaklık, nem ve hava durumu
@@ -88,7 +88,7 @@ Worker → **Settings** → **Variables and Secrets** → **Add**. Type olarak *
 
 ### 5) Açın ve telefona ekleyin
 1. **Settings → Domains & Routes** bölümünde `workers.dev` satırı Disabled görünüyorsa **Enable**'a basın.
-2. `https://tansiyon-takip.<hesap-adınız>.workers.dev` adresini telefonda Chrome ile açıp giriş yapın.
+2. `https://tansiyon.<hesap-adınız>.workers.dev` adresini telefonda Chrome ile açıp giriş yapın.
 3. Chrome menüsü (⋮) → **Ana ekrana ekle**.
 4. İlk fotoğrafta **kamera** ve **konum** izni verin. Konum izni olmadan sıcaklık ve yer bilgisi kaydedilmez.
 

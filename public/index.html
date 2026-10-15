@@ -151,6 +151,15 @@ main { padding-block: 16px 120px; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
 
+.radios { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
+.radios legend { padding: 0; margin-bottom: 6px; }
+.radios .opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.radios label {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-weight: 600;
+}
+.radios input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); flex: none; }
+.radios label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .field { display: grid; gap: 4px; }
 .field label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .input {
@@ -336,9 +345,16 @@ dialog h2 { font-size: 18px; }
           <button type="button" data-meal="ac" aria-pressed="false">Aç</button>
           <button type="button" data-meal="tok" aria-pressed="false">Tok</button>
         </div>
+        <fieldset class="radios">
+          <legend class="label">Ölçülen kol</legend>
+          <div class="opts">
+            <label><input type="radio" name="arm" id="armSol" value="sol" checked>Sol kol</label>
+            <label><input type="radio" name="arm" id="armSag" value="sag">Sağ kol</label>
+          </div>
+        </fieldset>
         <div class="field">
           <label for="note">Not (isteğe bağlı)</label>
-          <input class="input" id="note" maxlength="500" placeholder="Örn. ilacı içtim, sol kol, yorgunum">
+          <input class="input" id="note" maxlength="500" placeholder="Örn. ilacı içtim, yorgunum">
         </div>
         <label class="capture" for="camInput">
           <svg><use href="#i-cam"/></svg>
@@ -435,6 +451,13 @@ dialog h2 { font-size: 18px; }
       </div>
 
       <div class="panel">
+        <h2>Sol ve sağ kol karşılaştırması</h2>
+        <p class="sub">Ortalama değerler (mmHg). Kollar arasında 10 mmHg ve üzeri fark uyarı olarak gösterilir.</p>
+        <div class="legend"><span><i style="background:var(--sys)"></i>Büyük (SYS)</span><span><i style="background:var(--dia)"></i>Küçük (DIA)</span></div>
+        <div class="chart-box short"><canvas id="cArm" aria-label="Sol ve sağ kol karşılaştırması"></canvas></div>
+      </div>
+
+      <div class="panel">
         <h2>Günün saatine göre</h2>
         <p class="sub">Sabah 05–11, öğle 11–17, akşam 17–23, gece 23–05.</p>
         <div class="legend"><span><i style="background:var(--sys)"></i>Büyük (SYS)</span><span><i style="background:var(--dia)"></i>Küçük (DIA)</span></div>
@@ -522,6 +545,13 @@ dialog h2 { font-size: 18px; }
       <button type="button" data-meal="ac" aria-pressed="false">Aç</button>
       <button type="button" data-meal="tok" aria-pressed="false">Tok</button>
     </div>
+    <fieldset class="radios">
+      <legend class="label">Ölçülen kol</legend>
+      <div class="opts">
+        <label><input type="radio" name="eArm" id="eArmSol" value="sol">Sol kol</label>
+        <label><input type="radio" name="eArm" id="eArmSag" value="sag">Sağ kol</label>
+      </div>
+    </fieldset>
     <div class="field"><label for="eNote">Not</label><input class="input" id="eNote" maxlength="500"></div>
     <div class="error" id="editErr" hidden></div>
     <div class="row" id="editActions">
@@ -596,6 +626,8 @@ const fmt = {
 };
 const todayKey = () => fmt.dayKey(new Date().toISOString());
 const mealLabel = (m) => (m === "ac" ? "Aç" : m === "tok" ? "Tok" : null);
+const armLabel = (a) => (a === "sag" ? "Sağ kol" : a === "sol" ? "Sol kol" : null);
+const currentArm = () => ($('input[name="arm"]:checked')?.value || "sol");
 
 // ESH 2023 sınıflandırması (büyük ve küçük tansiyondan yüksek olan sınıf geçerli)
 const CLASSES = [
@@ -743,7 +775,7 @@ async function onPhoto(file) {
   try {
     const out = await api("/api/readings", {
       method: "POST",
-      body: { image: dataUrl.split(",")[1], image_type: "image/jpeg", meal: S.meal || null, note: $("#note").value, ...(loc ? { lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy } : {}) },
+      body: { image: dataUrl.split(",")[1], image_type: "image/jpeg", meal: S.meal || null, arm: currentArm(), note: $("#note").value, ...(loc ? { lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy } : {}) },
     });
     $("#busy").hidden = true;
     onSaved(out.reading, out.ocr_note);
@@ -780,7 +812,7 @@ $("#manualForm").addEventListener("submit", async (e) => {
       method: "POST",
       body: {
         sys: $("#mSys").value, dia: $("#mDia").value, pulse: $("#mPul").value,
-        meal: S.meal || null, note: $("#note").value,
+        meal: S.meal || null, arm: currentArm(), note: $("#note").value,
         ...(S.pendingImage ? { image: S.pendingImage.split(",")[1], image_type: "image/jpeg" } : {}),
         ...(loc ? { lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy } : {}),
       },
@@ -829,7 +861,7 @@ function showResult(r, ocrNote) {
       <h2>Kaydedildi</h2>${chip(r)}
     </div>
     ${lcdHtml(r)}
-    <div class="meta">${metaHtml(r)}${mealLabel(r.meal) ? `<span class="chip plain">${mealLabel(r.meal)}</span>` : ""}</div>
+    <div class="meta">${metaHtml(r)}${armLabel(r.arm) ? `<span class="chip plain">${armLabel(r.arm)}</span>` : ""}${mealLabel(r.meal) ? `<span class="chip plain">${mealLabel(r.meal)}</span>` : ""}</div>
     ${notes.join("")}
     <div class="row"><button class="btn" type="button" data-edit="${r.id}">${icon("i-edit")}Düzelt</button></div>`;
   el.hidden = false;
@@ -855,7 +887,7 @@ function itemHtml(r) {
     ${thumb}
     <div class="info">
       <div class="vals">${r.sys}/${r.dia}<small>${r.pulse != null ? "nabız " + r.pulse : ""}</small></div>
-      <div class="row" style="gap:6px">${chip(r)}${meal ? `<span class="chip plain">${meal}</span>` : ""}</div>
+      <div class="row" style="gap:6px">${chip(r)}${armLabel(r.arm) ? `<span class="chip plain">${armLabel(r.arm)}</span>` : ""}${meal ? `<span class="chip plain">${meal}</span>` : ""}</div>
       <div class="meta"><span>${icon("i-clock")}${esc(fmt.time(r.created_at))}</span>${metaHtml(r, false)}</div>
       ${r.note ? `<div class="small-note">${esc(r.note)}</div>` : ""}
     </div>
@@ -928,6 +960,7 @@ function openEdit(id) {
   $("#editNotion").hidden = !r.notion_url; if (r.notion_url) $("#editNotion").href = r.notion_url;
   $("#eSys").value = r.sys; $("#eDia").value = r.dia; $("#ePul").value = r.pulse ?? "";
   $("#eNote").value = r.note ?? ""; setEditMeal(r.meal || "");
+  (r.arm === "sag" ? $("#eArmSag") : $("#eArmSol")).checked = true;
   $("#editErr").hidden = true; $("#delConfirm").hidden = true; $("#editActions").hidden = false;
   $("#editDlg").showModal();
 }
@@ -936,7 +969,7 @@ $("#editSave").addEventListener("click", async () => {
   const r = S.editing; if (!r) return;
   $("#editErr").hidden = true;
   try {
-    const out = await api(`/api/readings/${r.id}`, { method: "PATCH", body: { sys: $("#eSys").value, dia: $("#eDia").value, pulse: $("#ePul").value, meal: S.editMeal || null, note: $("#eNote").value } });
+    const out = await api(`/api/readings/${r.id}`, { method: "PATCH", body: { sys: $("#eSys").value, dia: $("#eDia").value, pulse: $("#ePul").value, meal: S.editMeal || null, arm: $('input[name="eArm"]:checked')?.value || "sol", note: $("#eNote").value } });
     const i = S.all.findIndex((x) => x.id === r.id); if (i >= 0) S.all[i] = out.reading;
     $("#editDlg").close(); toast("Değişiklik kaydedildi");
     if (!$("#result").hidden && $("#result [data-edit]")?.dataset.edit == r.id) showResult(out.reading);
@@ -1006,6 +1039,11 @@ function computeAlerts(R) {
   if (ac.length >= 2 && tok.length >= 2) {
     const d = avg(tok.map((r) => r.sys)) - avg(ac.map((r) => r.sys));
     if (Math.abs(d) >= 10) out.push({ tone: "info", title: `Tok ölçümler aç ölçümlerden ${Math.abs(Math.round(d))} mmHg ${d > 0 ? "yüksek" : "düşük"}`, text: "Aç ve tok ölçümleriniz arasında belirgin fark var." });
+  }
+  const sol = R.filter((r) => r.arm === "sol"), sag = R.filter((r) => r.arm === "sag");
+  if (sol.length >= 2 && sag.length >= 2) {
+    const d = avg(sag.map((r) => r.sys)) - avg(sol.map((r) => r.sys));
+    if (Math.abs(d) >= 10) out.push({ tone: "warning", title: `Kollar arasında ${Math.abs(Math.round(d))} mmHg fark var`, text: `${d > 0 ? "Sağ" : "Sol"} kol daha yüksek ölçülüyor. Kollar arasında 10 mmHg ve üzeri fark doktorunuza söylenmesi gereken bir bulgudur; takibi yüksek ölçen koldan yapın.` });
   }
   const tk = todayKey();
   if (!S.all.some((r) => fmt.dayKey(r.created_at) === tk)) out.push({ tone: "info", title: "Bugün henüz ölçüm yapılmadı", text: "" });
@@ -1077,7 +1115,7 @@ function renderReport() {
   drawChart("cBp", {
     type: "line",
     data: { labels, datasets: [line(R.map((r) => r.sys), sys, "Büyük"), line(R.map((r) => r.dia), dia, "Küçük"), limit(s.warn_sys, "Sınır büyük"), limit(s.warn_dia, "Sınır küçük")] },
-    options: { ...base, plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, ...tipFilter, callbacks: { ...titleCb, afterBody: (items) => { const r = R[items[0].dataIndex]; const m = [mealLabel(r.meal), r.place, fmt.temp(r.temp_c)].filter(Boolean); return m.length ? m.join(" · ") : ""; } } } },
+    options: { ...base, plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, ...tipFilter, callbacks: { ...titleCb, afterBody: (items) => { const r = R[items[0].dataIndex]; const m = [armLabel(r.arm), mealLabel(r.meal), r.place, fmt.temp(r.temp_c)].filter(Boolean); return m.length ? m.join(" · ") : ""; } } } },
       scales: { ...base.scales, y: { ...base.scales.y, suggestedMin: 50, suggestedMax: 160, title: { display: true, text: "mmHg", color: muted } } } },
   });
 
@@ -1113,6 +1151,10 @@ function renderReport() {
     { name: "Aç", items: R.filter((r) => r.meal === "ac") },
     { name: "Tok", items: R.filter((r) => r.meal === "tok") },
     { name: "Belirtilmemiş", items: R.filter((r) => !r.meal) },
+  ]);
+  groupChart("cArm", [
+    { name: "Sol kol", items: R.filter((r) => r.arm === "sol") },
+    { name: "Sağ kol", items: R.filter((r) => r.arm === "sag") },
   ]);
   const part = (r) => { const h = fmt.hour(r.created_at); return h >= 5 && h < 11 ? 0 : h >= 11 && h < 17 ? 1 : h >= 17 && h < 23 ? 2 : 3; };
   groupChart("cTod", ["Sabah", "Öğle", "Akşam", "Gece"].map((name, i) => ({ name, items: R.filter((r) => part(r) === i) })));

@@ -1,5 +1,5 @@
 // Notion API yardımcıları ve tablo şeması.
-// Sütun adları 15 Ekim 2026'da Notion'daki gerçek tablolardan okunarak buraya kopyalandı.
+// Sütun adları 15 Ekim 2026'da Notion'daki gerçek tablolardan okunarak (Enlem/Boylam kaldırıldı, Kol eklendi) buraya kopyalandı.
 // Notion'da bir sütunun adını değiştirirseniz buradaki adı da aynen değiştirin;
 // ad harf harf eşleşmezse Notion o alanı yok sayar.
 
@@ -23,9 +23,8 @@ export const P = {
   source: "Kaynak",        // select: Fotoğraf | Fotoğraf + elle | Elle
   confidence: "Okuma güveni", // select: Yüksek | Orta | Düşük
   edited: "Düzeltildi",    // checkbox
-  lat: "Enlem",
-  lon: "Boylam",
-  map: "Harita",           // url
+  arm: "Kol",             // select: Sol kol | Sağ kol
+  map: "Harita",           // url (konumun Google Maps bağlantısı)
   photo: "Fotoğraf",       // files
 };
 
@@ -43,6 +42,8 @@ export const SETTINGS_PROPS = {
 
 export const MEAL_TO_NOTION = { ac: "Aç", tok: "Tok" };
 export const MEAL_FROM_NOTION = { "Aç": "ac", "Tok": "tok" };
+export const ARM_TO_NOTION = { sol: "Sol kol", sag: "Sağ kol" };
+export const ARM_FROM_NOTION = { "Sol kol": "sol", "Sağ kol": "sag" };
 export const SOURCE_TO_NOTION = { foto: "Fotoğraf", "foto+elle": "Fotoğraf + elle", elle: "Elle" };
 export const SOURCE_FROM_NOTION = { "Fotoğraf": "foto", "Fotoğraf + elle": "foto+elle", "Elle": "elle" };
 export const CONF_TO_NOTION = { yuksek: "Yüksek", orta: "Orta", dusuk: "Düşük" };

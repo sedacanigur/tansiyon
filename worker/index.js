@@ -12,7 +12,7 @@
 //   ANTHROPIC_API_KEY               fotoğraf okuma için Claude API anahtarı (secret)
 
 import {
-  P, SETTINGS_PROPS, MEAL_TO_NOTION, MEAL_FROM_NOTION, SOURCE_TO_NOTION, SOURCE_FROM_NOTION,
+  P, SETTINGS_PROPS, MEAL_TO_NOTION, MEAL_FROM_NOTION, ARM_TO_NOTION, ARM_FROM_NOTION, SOURCE_TO_NOTION, SOURCE_FROM_NOTION,
   CONF_TO_NOTION, CONF_FROM_NOTION, notionFetch, queryAll, uploadFile,
   num, text, sel, url as urlOf, check, dateStart, firstFileUrl,
   wTitle, wText, wNum, wSel, wUrl, wCheck,
@@ -105,6 +105,7 @@ function validValues(sys, dia, pulse) {
 }
 
 const normMeal = (m) => (m === "ac" || m === "tok" ? m : null);
+const normArm = (a) => (a === "sag" ? "sag" : "sol"); // varsayılan sol kol
 
 const tz = (env) => env.TIMEZONE || "Europe/Istanbul";
 const dsId = (env) => {
@@ -155,6 +156,9 @@ function weatherText(code) {
 function toReading(page) {
   const p = page.properties || {};
   const photoUrl = firstFileUrl(p[P.photo]);
+  // koordinat Harita bağlantısında saklanır
+  const mapUrl = urlOf(p[P.map]);
+  const ll = mapUrl && mapUrl.match(/q=(-?[\d.]+),(-?[\d.]+)/);
   return {
     id: page.id,
     created_at: dateStart(p[P.date]) || page.created_time,
@@ -163,8 +167,10 @@ function toReading(page) {
     pulse: num(p[P.pulse]),
     meal: MEAL_FROM_NOTION[sel(p[P.meal])] || null,
     note: text(p[P.note]),
-    lat: num(p[P.lat]),
-    lon: num(p[P.lon]),
+    arm: ARM_FROM_NOTION[sel(p[P.arm])] || null,
+    lat: ll ? Number(ll[1]) : null,
+    lon: ll ? Number(ll[2]) : null,
+    map_url: mapUrl,
     place: text(p[P.place]),
     temp_c: num(p[P.temp]),
     humidity: num(p[P.humidity]),
@@ -333,6 +339,7 @@ async function createReading(request, env) {
 
   let sys = toInt(body.sys), dia = toInt(body.dia), pulse = toInt(body.pulse);
   const meal = normMeal(body.meal);
+  const arm = normArm(body.arm);
   const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) || null : null;
   let lat = toNum(body.lat), lon = toNum(body.lon);
   if (lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180) { lat = null; lon = null; }
@@ -378,14 +385,13 @@ async function createReading(request, env) {
     [P.dia]: wNum(dia),
     [P.pulse]: wNum(pulse),
     [P.meal]: wSel(MEAL_TO_NOTION[meal]),
+    [P.arm]: wSel(ARM_TO_NOTION[arm]),
     [P.cls]: wSel(classify(sys, dia, settings)),
     [P.note]: wText(note),
     [P.source]: wSel(SOURCE_TO_NOTION[source]),
   };
   if (ocr?.confidence) properties[P.confidence] = wSel(CONF_TO_NOTION[ocr.confidence]);
   if (lat !== null) {
-    properties[P.lat] = wNum(Math.round(lat * 1e5) / 1e5);
-    properties[P.lon] = wNum(Math.round(lon * 1e5) / 1e5);
     properties[P.map] = wUrl(`https://www.google.com/maps?q=${lat.toFixed(5)},${lon.toFixed(5)}`);
   }
   if (place) properties[P.place] = wText(place);
@@ -433,6 +439,7 @@ async function updateReading(request, env, id) {
   const dia = "dia" in body ? toInt(body.dia) : current.dia;
   const pulse = "pulse" in body ? toInt(body.pulse) : current.pulse;
   const meal = "meal" in body ? normMeal(body.meal) : current.meal;
+  const arm = "arm" in body ? normArm(body.arm) : current.arm;
   const note = "note" in body ? (String(body.note || "").trim().slice(0, 500) || null) : current.note;
   const invalid = validValues(sys, dia, pulse);
   if (invalid) return err(invalid);
@@ -448,6 +455,7 @@ async function updateReading(request, env, id) {
         [P.dia]: wNum(dia),
         [P.pulse]: wNum(pulse),
         [P.meal]: wSel(MEAL_TO_NOTION[meal]),
+        [P.arm]: wSel(ARM_TO_NOTION[arm]),
         [P.cls]: wSel(classify(sys, dia, settings)),
         [P.note]: wText(note),
         [P.edited]: wCheck(current.edited || valuesChanged),
@@ -500,15 +508,15 @@ async function exportCsv(env) {
     return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const n = (v) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
-  const header = ["Tarih", "Saat", "Büyük (SYS)", "Küçük (DIA)", "Nabız", "Aç/Tok", "Konum", "Dış sıcaklık (°C)", "Nem (%)", "Hava", "Not", "Kaynak", "Enlem", "Boylam"];
+  const header = ["Tarih", "Saat", "Büyük (SYS)", "Küçük (DIA)", "Nabız", "Kol", "Aç/Tok", "Konum", "Dış sıcaklık (°C)", "Nem (%)", "Hava", "Not", "Kaynak", "Harita"];
   const lines = [header.join(";")];
   for (const r of rows) {
     const d = new Date(r.created_at);
     lines.push([
-      dfmt.format(d), tfmt.format(d), r.sys, r.dia, r.pulse ?? "",
+      dfmt.format(d), tfmt.format(d), r.sys, r.dia, r.pulse ?? "", ARM_TO_NOTION[r.arm] || "",
       r.meal === "ac" ? "Aç" : r.meal === "tok" ? "Tok" : "",
       cell(r.place), n(r.temp_c), n(r.humidity), cell(r.weather), cell(r.note), SOURCE_TO_NOTION[r.source] || "",
-      n(r.lat), n(r.lon),
+      r.map_url || "",
     ].join(";"));
   }
   const stampDay = new Date().toISOString().slice(0, 10);
