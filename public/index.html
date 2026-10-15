@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tansiyon Takip</title>
+<meta name="theme-color" content="#1d4a45">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Düzen: tek sütun, telefon öncelikli; altta sabit sekme çubuğu.
+   Ölçüm değerleri tansiyon aletinin LCD paneline benzeyen bir kutuda gösterilir. */
+:root {
+  color-scheme: light;
+  --bg: #f3f5f2;
+  --surface: #fcfdfb;
+  --ink: #142320;
+  --ink-2: #4c5b57;
+  --muted: #7d8a86;
+  --line: #dde3df;
+  --accent: #1d4a45;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2ece9;
+  --lcd: #cfd8c4;
+  --lcd-ink: #1b2618;
+  --lcd-dim: #6f7c66;
+  --sys: #2a78d6;
+  --dia: #eb6834;
+  --pulse: #1baf7a;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-bg: #e3f3e1;
+  --warning-bg: #fdf1d6;
+  --serious-bg: #fce6dc;
+  --critical-bg: #f9dede;
+  --info-bg: #e4edf8;
+  --grid: #e3e8e4;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1514; --surface: #171f1d; --ink: #e9efec; --ink-2: #b4c0bc; --muted: #84918d;
+    --line: #2a3533; --accent: #7fc3b8; --accent-ink: #0d1c19; --accent-soft: #1f2f2c;
+    --lcd: #1d2a1f; --lcd-ink: #cfe8c6; --lcd-dim: #7c9874;
+    --sys: #3987e5; --dia: #d95926; --pulse: #199e70;
+    --good-bg: #16301a; --warning-bg: #36290c; --serious-bg: #3a2218; --critical-bg: #3d1a1a; --info-bg: #182739;
+    --grid: #26302e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1514; --surface: #171f1d; --ink: #e9efec; --ink-2: #b4c0bc; --muted: #84918d;
+  --line: #2a3533; --accent: #7fc3b8; --accent-ink: #0d1c19; --accent-soft: #1f2f2c;
+  --lcd: #1d2a1f; --lcd-ink: #cfe8c6; --lcd-dim: #7c9874;
+  --sys: #3987e5; --dia: #d95926; --pulse: #199e70;
+  --good-bg: #16301a; --warning-bg: #36290c; --serious-bg: #3a2218; --critical-bg: #3d1a1a; --info-bg: #182739;
+  --grid: #26302e;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.45 var(--font-body);
+  -webkit-text-size-adjust: 100%;
+}
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; color: inherit; }
+img { max-width: 100%; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 720px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* üst çubuk */
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top, 0px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+.brand svg { width: 28px; height: 28px; flex: none; }
+.today-count { font-size: 13px; color: var(--ink-2); }
+
+main { padding-block: 16px 120px; }
+.view { display: grid; gap: 16px; }
+
+/* alt sekmeler */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.tabs .inner { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+.tab {
+  background: none; border: 0; padding: 10px 4px 12px; cursor: pointer;
+  display: grid; justify-items: center; gap: 2px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-selected="true"] { color: var(--accent); }
+
+/* bloklar */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.panel h2 { font-size: 17px; font-weight: 700; }
+.panel .sub { font-size: 13.5px; color: var(--ink-2); margin: -6px 0 0; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* düğmeler */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px; text-decoration: none; color: var(--ink);
+}
+.btn svg { width: 20px; height: 20px; flex: none; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--critical); }
+.btn.danger-solid { background: var(--critical); border-color: var(--critical); color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.capture {
+  display: grid; justify-items: center; gap: 6px; text-align: center;
+  background: var(--accent); color: var(--accent-ink); border-radius: 14px;
+  padding: 26px 16px; cursor: pointer; border: 0; width: 100%;
+}
+.capture svg { width: 44px; height: 44px; }
+.capture strong { font-size: 20px; }
+.capture span { font-size: 14px; opacity: .85; }
+
+/* aç/tok seçimi */
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 10px 6px; font-weight: 600; cursor: pointer; min-height: 44px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+
+.field { display: grid; gap: 4px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.input {
+  width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px;
+  padding: 10px 12px; min-height: 44px;
+}
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+.loc { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); }
+.loc svg { width: 18px; height: 18px; flex: none; }
+
+/* LCD panel */
+.lcd {
+  background: var(--lcd); color: var(--lcd-ink); border-radius: 10px; padding: 12px 16px;
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 12px; row-gap: 0;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.12);
+}
+.lcd .k { font: 600 13px/1 var(--font-body); letter-spacing: .08em; color: var(--lcd-dim); }
+.lcd .k small { display: block; font-size: 10.5px; letter-spacing: .04em; margin-top: 3px; }
+.lcd .v { font: 700 56px/1.02 var(--font-num); text-align: right; font-variant-numeric: tabular-nums; }
+.lcd .v.pul { font-size: 40px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px 3px 8px;
+  font-size: 13px; font-weight: 600; background: var(--accent-soft); color: var(--ink); white-space: nowrap;
+}
+.chip i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; display: inline-block; }
+.chip.good { background: var(--good-bg); } .chip.good i { background: var(--good); }
+.chip.warning { background: var(--warning-bg); } .chip.warning i { background: var(--warning); }
+.chip.serious { background: var(--serious-bg); } .chip.serious i { background: var(--serious); }
+.chip.critical { background: var(--critical-bg); } .chip.critical i { background: var(--critical); }
+.chip.plain { background: transparent; border: 1px solid var(--line); color: var(--ink-2); }
+
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; color: var(--ink-2); }
+.meta span { display: inline-flex; align-items: center; gap: 5px; }
+.meta svg { width: 16px; height: 16px; }
+
+/* uyarılar */
+.alert { display: grid; grid-template-columns: 24px 1fr; gap: 10px; padding: 12px; border-radius: 8px; background: var(--info-bg); font-size: 14.5px; }
+.alert svg { width: 22px; height: 22px; }
+.alert b { display: block; font-size: 15px; }
+.alert.good { background: var(--good-bg); } .alert.good svg { color: var(--good); }
+.alert.warning { background: var(--warning-bg); } .alert.warning svg { color: #b67d00; }
+.alert.serious { background: var(--serious-bg); } .alert.serious svg { color: var(--serious); }
+.alert.critical { background: var(--critical-bg); } .alert.critical svg { color: var(--critical); }
+.alert.info svg { color: var(--sys); }
+.alerts { display: grid; gap: 8px; }
+
+/* özet kutuları */
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 600px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+.tile .n { font: 700 30px/1.1 var(--font-num); }
+.tile .n small { font: 500 14px var(--font-body); color: var(--muted); }
+.tile .d { font-size: 12.5px; color: var(--ink-2); }
+
+.periods { display: flex; gap: 6px; flex-wrap: wrap; }
+.periods button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-weight: 600; cursor: pointer; min-height: 36px; }
+.periods button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.chart-box { position: relative; height: 240px; }
+.chart-box.short { height: 180px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend i.dash { background: repeating-linear-gradient(90deg, var(--muted) 0 4px, transparent 4px 7px) !important; }
+.empty { color: var(--ink-2); font-size: 14.5px; padding: 8px 0; }
+
+.dist { display: grid; gap: 6px; }
+.dist .r { display: grid; grid-template-columns: minmax(0, 150px) 1fr 36px; gap: 8px; align-items: center; font-size: 14px; }
+.dist .bar { height: 12px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.dist .bar b { display: block; height: 100%; border-radius: 3px; }
+.dist .c { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+/* kayıt listesi */
+.day { display: grid; gap: 8px; }
+.day h3 { font-size: 14px; font-weight: 700; color: var(--ink-2); padding-top: 6px; }
+.item {
+  display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+}
+.item .t { font: 600 17px var(--font-num); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.item .vals { font: 700 26px/1.1 var(--font-num); font-variant-numeric: tabular-nums; }
+.item .vals small { font: 500 15px var(--font-body); color: var(--ink-2); margin-left: 6px; }
+.item .info { min-width: 0; display: grid; gap: 4px; }
+.item .meta { font-size: 13px; }
+.thumb svg { width: 22px; height: 22px; }
+.thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--line); cursor: pointer; background: var(--lcd); }
+.item .side { display: grid; justify-items: end; gap: 6px; }
+.iconbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; color: var(--ink-2); }
+.iconbtn svg { width: 20px; height: 20px; }
+
+/* diyalog */
+dialog {
+  border: 0; border-radius: 12px; padding: 0; width: min(440px, calc(100vw - 32px));
+  background: var(--surface); color: var(--ink); box-shadow: 0 20px 50px rgba(0,0,0,.3);
+}
+dialog::backdrop { background: rgba(10, 20, 18, .55); }
+dialog form, dialog .dbody { padding: 18px; display: grid; gap: 12px; }
+dialog h2 { font-size: 18px; }
+.photo-dialog { width: min(720px, calc(100vw - 24px)); }
+.photo-dialog img { display: block; width: 100%; height: auto; max-height: 75vh; object-fit: contain; background: #000; border-radius: 12px 12px 0 0; }
+
+.preview { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; }
+.preview img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.5s; } }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14.5px;
+  max-width: calc(100vw - 32px);
+}
+
+/* giriş */
+.login { min-height: 100vh; display: grid; place-items: center; padding-block: 24px; }
+.login .panel { width: min(380px, 100%); padding: 24px; gap: 16px; }
+.login .brand { font-size: 22px; }
+.error { color: var(--critical); font-size: 14px; font-weight: 600; }
+.small-note { font-size: 13px; color: var(--muted); }
+
+@media print {
+  .tabs, .topbar, .no-print, .periods { display: none !important; }
+  body { background: #fff; }
+  main { padding: 0; }
+  .panel { break-inside: avoid; border-color: #ccc; }
+}
+</style>
+</head>
+<body>
+
+<!-- simge seti -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M5 15l4-5 4 3 6-7"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-temp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 16l-5-5-8 8.5"/></symbol>
+  <symbol id="i-keys" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 10"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="7" rx="1.5"/><path d="M7 14h10v6H7z"/></symbol>
+  <symbol id="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#1d4a45"/><path d="M5 17h5l2.5-6 4 11 3-8 1.8 3H27" fill="none" stroke="#cfe8c6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- GİRİŞ -->
+<section id="login" class="login wrap" hidden>
+  <form class="panel" id="loginForm">
+    <div class="brand"><svg><use href="#logo"/></svg>Tansiyon Takip</div>
+    <div class="field">
+      <label for="pw">Şifre</label>
+      <input class="input" id="pw" type="password" autocomplete="current-password" required>
+    </div>
+    <div class="error" id="loginErr" hidden></div>
+    <button class="btn primary" type="submit" id="loginBtn">Giriş yap</button>
+  </form>
+</section>
+
+<!-- UYGULAMA -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brand"><svg><use href="#logo"/></svg>Tansiyon Takip</div>
+      <div class="today-count" id="todayCount"></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- ÖLÇ -->
+    <section class="view" id="v-olc">
+      <div class="panel">
+        <div class="label">Bu ölçüm</div>
+        <div class="seg" role="group" aria-label="Aç / tok durumu">
+          <button type="button" data-meal="" aria-pressed="true">Belirtme</button>
+          <button type="button" data-meal="ac" aria-pressed="false">Aç</button>
+          <button type="button" data-meal="tok" aria-pressed="false">Tok</button>
+        </div>
+        <div class="field">
+          <label for="note">Not (isteğe bağlı)</label>
+          <input class="input" id="note" maxlength="500" placeholder="Örn. ilacı içtim, sol kol, yorgunum">
+        </div>
+        <label class="capture" for="camInput">
+          <svg><use href="#i-cam"/></svg>
+          <strong>Fotoğraf çek</strong>
+          <span>Tansiyon aletinin ekranını düz ve yakından çekin</span>
+        </label>
+        <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="galInput" accept="image/*" hidden>
+        <div class="row">
+          <label class="btn" for="galInput"><svg><use href="#i-img"/></svg>Galeriden seç</label>
+          <button class="btn" type="button" id="manualBtn"><svg><use href="#i-keys"/></svg>Elle gir</button>
+        </div>
+        <div class="loc" id="locLine"><svg><use href="#i-pin"/></svg><span>Konum fotoğraf çekilince alınır</span></div>
+      </div>
+
+      <!-- işlem durumu -->
+      <div class="panel" id="busy" hidden>
+        <div class="preview">
+          <img id="busyImg" alt="Çekilen fotoğraf">
+          <div><span class="spinner"></span> <b id="busyText">Değerler okunuyor…</b><div class="small-note">Konum ve hava durumu da ekleniyor.</div></div>
+        </div>
+      </div>
+
+      <!-- elle giriş / okunamadı -->
+      <form class="panel" id="manualForm" hidden>
+        <h2 id="manualTitle">Değerleri girin</h2>
+        <p class="sub" id="manualSub"></p>
+        <div class="preview" id="manualPreview" hidden><img id="manualImg" alt="Çekilen fotoğraf"><div class="small-note">Fotoğraf kayda eklenecek.</div></div>
+        <div class="grid3">
+          <div class="field"><label for="mSys">Büyük (SYS)</label><input class="input" id="mSys" type="number" inputmode="numeric" min="50" max="300" required></div>
+          <div class="field"><label for="mDia">Küçük (DIA)</label><input class="input" id="mDia" type="number" inputmode="numeric" min="20" max="200" required></div>
+          <div class="field"><label for="mPul">Nabız</label><input class="input" id="mPul" type="number" inputmode="numeric" min="20" max="250"></div>
+        </div>
+        <div class="error" id="manualErr" hidden></div>
+        <div class="row">
+          <button class="btn primary" type="submit" id="manualSave">Kaydet</button>
+          <button class="btn" type="button" id="manualCancel">Vazgeç</button>
+        </div>
+      </form>
+
+      <!-- son kayıt sonucu -->
+      <div class="panel" id="result" hidden></div>
+
+      <div class="panel">
+        <h2>Bugün</h2>
+        <div id="todayList" class="day"></div>
+      </div>
+    </section>
+
+    <!-- RAPOR -->
+    <section class="view" id="v-rapor" hidden>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="periods" role="group" aria-label="Dönem">
+          <button type="button" data-days="7">7 gün</button>
+          <button type="button" data-days="30">30 gün</button>
+          <button type="button" data-days="90">90 gün</button>
+          <button type="button" data-days="0">Tümü</button>
+        </div>
+        <div class="row no-print">
+          <a class="btn small" href="/api/export.csv"><svg><use href="#i-down"/></svg>Excel (CSV)</a>
+          <button class="btn small" type="button" onclick="window.print()"><svg><use href="#i-print"/></svg>Yazdır</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Uyarılar</h2>
+        <div class="alerts" id="alerts"></div>
+      </div>
+
+      <div class="tiles" id="tiles"></div>
+
+      <div class="panel">
+        <h2>Tansiyon seyri</h2>
+        <div class="legend" id="bpLegend"></div>
+        <div class="chart-box"><canvas id="cBp" aria-label="Tansiyon seyri grafiği"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2>Nabız</h2>
+        <div class="chart-box short"><canvas id="cPulse" aria-label="Nabız grafiği"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2>Sınıflandırma</h2>
+        <p class="sub">ESH 2023 sınıflarına göre ölçümlerin dağılımı.</p>
+        <div class="dist" id="dist"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Aç ve tok karşılaştırması</h2>
+        <p class="sub">Ortalama değerler (mmHg).</p>
+        <div class="legend"><span><i style="background:var(--sys)"></i>Büyük (SYS)</span><span><i style="background:var(--dia)"></i>Küçük (DIA)</span></div>
+        <div class="chart-box short"><canvas id="cMeal" aria-label="Aç tok karşılaştırması"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2>Günün saatine göre</h2>
+        <p class="sub">Sabah 05–11, öğle 11–17, akşam 17–23, gece 23–05.</p>
+        <div class="legend"><span><i style="background:var(--sys)"></i>Büyük (SYS)</span><span><i style="background:var(--dia)"></i>Küçük (DIA)</span></div>
+        <div class="chart-box short"><canvas id="cTod" aria-label="Günün saatine göre ortalamalar"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2>Dış sıcaklık ve büyük tansiyon</h2>
+        <p class="sub" id="tempSub">Her nokta bir ölçüm.</p>
+        <div class="chart-box short"><canvas id="cTemp" aria-label="Sıcaklık ve tansiyon"></canvas></div>
+      </div>
+    </section>
+
+    <!-- KAYITLAR -->
+    <section class="view" id="v-kayit" hidden>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h2 style="font-size:18px">Tüm ölçümler</h2>
+        <a class="btn small" href="/api/export.csv"><svg><use href="#i-down"/></svg>Excel (CSV)</a>
+      </div>
+      <div id="allList" class="view"></div>
+    </section>
+
+    <!-- AYARLAR -->
+    <section class="view" id="v-ayar" hidden>
+      <form class="panel" id="settingsForm">
+        <h2>Uyarı sınırları</h2>
+        <p class="sub">Varsayılanlar ev ölçümü için Avrupa Hipertansiyon Derneği (ESH) değerleridir. Doktorunuz farklı bir hedef verdiyse buradan değiştirin.</p>
+        <div class="label">Yüksek (uyarı)</div>
+        <div class="grid3">
+          <div class="field"><label for="s_warn_sys">Büyük ≥</label><input class="input" id="s_warn_sys" type="number" inputmode="numeric"></div>
+          <div class="field"><label for="s_warn_dia">Küçük ≥</label><input class="input" id="s_warn_dia" type="number" inputmode="numeric"></div>
+        </div>
+        <div class="label">Acil</div>
+        <div class="grid3">
+          <div class="field"><label for="s_crisis_sys">Büyük ≥</label><input class="input" id="s_crisis_sys" type="number" inputmode="numeric"></div>
+          <div class="field"><label for="s_crisis_dia">Küçük ≥</label><input class="input" id="s_crisis_dia" type="number" inputmode="numeric"></div>
+        </div>
+        <div class="label">Düşük</div>
+        <div class="grid3">
+          <div class="field"><label for="s_low_sys">Büyük &lt;</label><input class="input" id="s_low_sys" type="number" inputmode="numeric"></div>
+          <div class="field"><label for="s_low_dia">Küçük &lt;</label><input class="input" id="s_low_dia" type="number" inputmode="numeric"></div>
+        </div>
+        <div class="label">Nabız</div>
+        <div class="grid3">
+          <div class="field"><label for="s_pulse_high">Yüksek &gt;</label><input class="input" id="s_pulse_high" type="number" inputmode="numeric"></div>
+          <div class="field"><label for="s_pulse_low">Düşük &lt;</label><input class="input" id="s_pulse_low" type="number" inputmode="numeric"></div>
+        </div>
+        <div class="error" id="settingsErr" hidden></div>
+        <div class="row"><button class="btn primary" type="submit">Kaydet</button></div>
+      </form>
+
+      <div class="panel">
+        <h2>Uygulama</h2>
+        <p class="sub" id="ocrStatus"></p>
+        <p class="small-note">Telefonun ana ekranına eklemek için: Chrome menüsü (⋮) → <b>Ana ekrana ekle</b>. Uygulama gibi açılır.</p>
+        <p class="small-note">Ölçümler, fotoğraflar ve bu sınırlar Notion'daki Tansiyon sayfasında saklanır.</p>
+        <p class="small-note">Bu uygulama tanı koymaz; uyarılar bilgilendirme amaçlıdır. Değerleriniz hakkında doktorunuza danışın.</p>
+        <div class="row"><button class="btn danger" type="button" id="logoutBtn">Çıkış yap</button></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" aria-label="Bölümler">
+    <div class="inner" role="tablist">
+      <button class="tab" role="tab" data-view="olc" aria-selected="true"><svg><use href="#i-cam"/></svg>Ölç</button>
+      <button class="tab" role="tab" data-view="rapor" aria-selected="false"><svg><use href="#i-chart"/></svg>Rapor</button>
+      <button class="tab" role="tab" data-view="kayit" aria-selected="false"><svg><use href="#i-list"/></svg>Kayıtlar</button>
+      <button class="tab" role="tab" data-view="ayar" aria-selected="false"><svg><use href="#i-gear"/></svg>Ayarlar</button>
+    </div>
+  </nav>
+</div>
+
+<!-- düzenleme -->
+<dialog id="editDlg">
+  <form id="editForm" method="dialog">
+    <h2>Ölçümü düzenle</h2>
+    <div class="row" style="justify-content:space-between;align-items:center"><span class="small-note" id="editWhen"></span><a class="small-note" id="editNotion" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">Notion'da aç</a></div>
+    <div class="grid3">
+      <div class="field"><label for="eSys">Büyük</label><input class="input" id="eSys" type="number" inputmode="numeric" required></div>
+      <div class="field"><label for="eDia">Küçük</label><input class="input" id="eDia" type="number" inputmode="numeric" required></div>
+      <div class="field"><label for="ePul">Nabız</label><input class="input" id="ePul" type="number" inputmode="numeric"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Aç / tok durumu" id="eMeal">
+      <button type="button" data-meal="" aria-pressed="true">Belirtme</button>
+      <button type="button" data-meal="ac" aria-pressed="false">Aç</button>
+      <button type="button" data-meal="tok" aria-pressed="false">Tok</button>
+    </div>
+    <div class="field"><label for="eNote">Not</label><input class="input" id="eNote" maxlength="500"></div>
+    <div class="error" id="editErr" hidden></div>
+    <div class="row" id="editActions">
+      <button class="btn primary" type="button" id="editSave">Kaydet</button>
+      <button class="btn" type="button" id="editClose">Kapat</button>
+      <button class="btn danger" type="button" id="editDel" style="margin-left:auto">Sil</button>
+    </div>
+    <div class="row" id="delConfirm" hidden>
+      <span style="flex-basis:100%;font-weight:600">Bu ölçüm ve fotoğrafı silinsin mi?</span>
+      <button class="btn danger-solid" type="button" id="delYes">Evet, sil</button>
+      <button class="btn" type="button" id="delNo">Vazgeç</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="photoDlg" class="photo-dialog">
+  <img id="photoImg" alt="Ölçüm fotoğrafı">
+  <div class="dbody"><div class="row" style="justify-content:space-between;align-items:center"><span class="small-note" id="photoCap"></span><button class="btn" type="button" id="photoClose">Kapat</button></div></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+"use strict";
+
+// ------------------------------------------------------------ durum
+const S = {
+  tz: "Europe/Istanbul",
+  settings: null,
+  ocr: true,
+  readings: [],       // seçili dönemdeki ölçümler (rapor)
+  all: [],            // tüm ölçümler (kayıtlar + bugün)
+  days: 30,
+  meal: "",
+  view: "olc",
+  pendingImage: null, // elle girişte eklenecek fotoğraf
+  editing: null,
+  editMeal: "",
+  charts: {},
+};
+try { const d = localStorage.getItem("tt_days"); if (d !== null) S.days = Number(d); } catch {}
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const icon = (id) => `<svg><use href="#${id}"/></svg>`;
+
+// ------------------------------------------------------------ API
+async function api(path, opts = {}) {
+  const init = { credentials: "same-origin", ...opts, headers: { ...(opts.headers || {}) } };
+  if (opts.body && typeof opts.body !== "string") { init.body = JSON.stringify(opts.body); init.headers["content-type"] = "application/json"; }
+  let res;
+  try { res = await fetch(path, init); }
+  catch { throw Object.assign(new Error("İnternet bağlantısı yok ya da sunucuya ulaşılamadı."), { status: 0 }); }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (res.status === 401 && data?.code === "giris") { showLogin(); throw Object.assign(new Error("Giriş gerekli"), { status: 401 }); }
+  if (!res.ok) throw Object.assign(new Error(data?.error || "Bir hata oluştu."), { status: res.status, data });
+  return data;
+}
+
+// ------------------------------------------------------------ biçimlendirme
+const fmt = {
+  time: (iso) => new Intl.DateTimeFormat("tr-TR", { timeZone: S.tz, hour: "2-digit", minute: "2-digit" }).format(new Date(iso)),
+  day: (iso) => new Intl.DateTimeFormat("tr-TR", { timeZone: S.tz, day: "numeric", month: "long", weekday: "long" }).format(new Date(iso)),
+  short: (iso) => new Intl.DateTimeFormat("tr-TR", { timeZone: S.tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)),
+  dayShort: (iso) => new Intl.DateTimeFormat("tr-TR", { timeZone: S.tz, day: "numeric", month: "short" }).format(new Date(iso)),
+  dayKey: (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: S.tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)),
+  hour: (iso) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: S.tz, hour: "2-digit", hourCycle: "h23" }).format(new Date(iso))),
+  temp: (t) => (t === null || t === undefined ? null : `${Math.round(t * 10) / 10}`.replace(".", ",") + " °C"),
+};
+const todayKey = () => fmt.dayKey(new Date().toISOString());
+const mealLabel = (m) => (m === "ac" ? "Aç" : m === "tok" ? "Tok" : null);
+
+// ESH 2023 sınıflandırması (büyük ve küçük tansiyondan yüksek olan sınıf geçerli)
+const CLASSES = [
+  { key: "dusuk", name: "Düşük", tone: "warning" },
+  { key: "optimal", name: "Optimal", tone: "good" },
+  { key: "normal", name: "Normal", tone: "good" },
+  { key: "yuksek_normal", name: "Yüksek normal", tone: "warning" },
+  { key: "evre1", name: "Evre 1 hipertansiyon", tone: "serious" },
+  { key: "evre2", name: "Evre 2 hipertansiyon", tone: "critical" },
+  { key: "evre3", name: "Evre 3 hipertansiyon", tone: "critical" },
+];
+function classify(r) {
+  const s = S.settings;
+  if (r.sys < s.low_sys || r.dia < s.low_dia) return CLASSES[0];
+  const sc = r.sys >= 180 ? 6 : r.sys >= 160 ? 5 : r.sys >= 140 ? 4 : r.sys >= 130 ? 3 : r.sys >= 120 ? 2 : 1;
+  const dc = r.dia >= 110 ? 6 : r.dia >= 100 ? 5 : r.dia >= 90 ? 4 : r.dia >= 85 ? 3 : r.dia >= 80 ? 2 : 1;
+  return CLASSES[Math.max(sc, dc)];
+}
+const isCrisis = (r) => r.sys >= S.settings.crisis_sys || r.dia >= S.settings.crisis_dia;
+const isHigh = (r) => r.sys >= S.settings.warn_sys || r.dia >= S.settings.warn_dia;
+const isLow = (r) => r.sys < S.settings.low_sys || r.dia < S.settings.low_dia;
+const pulseOff = (r) => r.pulse != null && (r.pulse > S.settings.pulse_high || r.pulse < S.settings.pulse_low);
+
+const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+const r0 = (n) => (n === null ? "–" : Math.round(n));
+
+function chip(r) {
+  const c = classify(r);
+  return `<span class="chip ${c.tone}"><i></i>${esc(c.name)}</span>`;
+}
+
+// ------------------------------------------------------------ toast
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
+}
+
+// ------------------------------------------------------------ giriş
+function showLogin() { $("#app").hidden = true; $("#login").hidden = false; setTimeout(() => $("#pw").focus(), 50); }
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#loginBtn"); btn.disabled = true; $("#loginErr").hidden = true;
+  try {
+    await api("/api/login", { method: "POST", body: { password: $("#pw").value } });
+    $("#pw").value = ""; await boot();
+  } catch (er) {
+    if (er.status !== 401 || er.data?.error) { $("#loginErr").textContent = er.message; $("#loginErr").hidden = false; }
+  } finally { btn.disabled = false; }
+});
+$("#logoutBtn").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }).catch(() => {}); showLogin(); });
+
+// ------------------------------------------------------------ sekmeler
+function setView(v) {
+  S.view = v;
+  for (const t of $$(".tab")) t.setAttribute("aria-selected", String(t.dataset.view === v));
+  for (const id of ["olc", "rapor", "kayit", "ayar"]) $("#v-" + id).hidden = id !== v;
+  if (v === "rapor") renderReport();
+  if (v === "kayit") renderAll();
+  if (v === "ayar") fillSettings();
+  window.scrollTo({ top: 0 });
+}
+for (const t of $$(".tab")) t.addEventListener("click", () => setView(t.dataset.view));
+
+// ------------------------------------------------------------ veri
+async function loadAll() {
+  const { readings } = await api("/api/readings");
+  S.all = readings;
+  filterPeriod();
+}
+function filterPeriod() {
+  if (!S.days) { S.readings = S.all.slice(); return; }
+  const since = Date.now() - S.days * 86400e3;
+  S.readings = S.all.filter((r) => new Date(r.created_at).getTime() >= since);
+}
+function refreshViews() {
+  filterPeriod();
+  renderToday();
+  if (S.view === "rapor") renderReport();
+  if (S.view === "kayit") renderAll();
+}
+
+// ------------------------------------------------------------ ölçüm akışı
+for (const b of $$("#v-olc .seg button")) {
+  b.addEventListener("click", () => {
+    S.meal = b.dataset.meal;
+    for (const x of $$("#v-olc .seg button")) x.setAttribute("aria-pressed", String(x === b));
+  });
+}
+
+// Konum: önce taze konum, olmazsa son 6 saatteki konum
+let lastLoc = null;
+try { lastLoc = JSON.parse(localStorage.getItem("tt_loc") || "null"); } catch {}
+function setLocLine(text) { $("#locLine span").textContent = text; }
+function getLocation() {
+  return new Promise((resolve) => {
+    const fallback = () => {
+      if (lastLoc && Date.now() - lastLoc.at < 6 * 3600e3) { setLocLine("Son bilinen konum kullanılıyor"); resolve(lastLoc); }
+      else resolve(null);
+    };
+    if (!("geolocation" in navigator)) { setLocLine("Bu tarayıcı konum vermiyor"); return fallback(); }
+    setLocLine("Konum alınıyor…");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        lastLoc = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, at: Date.now() };
+        try { localStorage.setItem("tt_loc", JSON.stringify(lastLoc)); } catch {}
+        setLocLine(`Konum alındı (±${Math.round(p.coords.accuracy)} m)`);
+        resolve(lastLoc);
+      },
+      (e) => {
+        setLocLine(e.code === 1 ? "Konum izni verilmedi. Tarayıcı ayarlarından izin verebilirsiniz." : "Konum alınamadı");
+        fallback();
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60e3 }
+    );
+  });
+}
+
+// Fotoğrafı ~1280 px'e küçültüp JPEG'e çevirir (yükleme hızı ve okuma maliyeti için)
+function shrinkImage(file, maxEdge = 1280) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Fotoğraf açılamadı.")); };
+    img.src = url;
+  });
+}
+
+async function onPhoto(file) {
+  if (!file) return;
+  $("#result").hidden = true; $("#manualForm").hidden = true;
+  let dataUrl;
+  try { dataUrl = await shrinkImage(file); } catch (e) { toast(e.message); return; }
+  $("#busyImg").src = dataUrl; $("#busyText").textContent = "Değerler okunuyor…"; $("#busy").hidden = false;
+  $("#busy").scrollIntoView({ behavior: "smooth", block: "center" });
+  const loc = await getLocation();
+  try {
+    const out = await api("/api/readings", {
+      method: "POST",
+      body: { image: dataUrl.split(",")[1], image_type: "image/jpeg", meal: S.meal || null, note: $("#note").value, ...(loc ? { lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy } : {}) },
+    });
+    $("#busy").hidden = true;
+    onSaved(out.reading, out.ocr_note);
+  } catch (e) {
+    $("#busy").hidden = true;
+    if (e.status === 401) return;
+    // okunamadı → elle giriş, fotoğraf korunur
+    openManual(dataUrl, e.data?.partial, e.message, loc);
+  }
+}
+$("#camInput").addEventListener("change", (e) => { onPhoto(e.target.files[0]); e.target.value = ""; });
+$("#galInput").addEventListener("change", (e) => { onPhoto(e.target.files[0]); e.target.value = ""; });
+
+let manualLoc = null;
+function openManual(dataUrl, partial, reason, loc) {
+  S.pendingImage = dataUrl || null; manualLoc = loc || null;
+  $("#manualTitle").textContent = dataUrl ? "Fotoğraf okunamadı" : "Değerleri girin";
+  $("#manualSub").textContent = dataUrl ? (reason || "") + " Değerleri aşağıya yazarak kaydedebilirsiniz." : "Tansiyon aletindeki üç değeri yazın.";
+  $("#manualSub").hidden = false;
+  $("#manualPreview").hidden = !dataUrl; if (dataUrl) $("#manualImg").src = dataUrl;
+  $("#mSys").value = partial?.sys ?? ""; $("#mDia").value = partial?.dia ?? ""; $("#mPul").value = partial?.pulse ?? "";
+  $("#manualErr").hidden = true; $("#manualForm").hidden = false; $("#result").hidden = true;
+  $("#manualForm").scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => $("#mSys").focus(), 300);
+}
+$("#manualBtn").addEventListener("click", async () => { openManual(null); manualLoc = await getLocation(); });
+$("#manualCancel").addEventListener("click", () => { $("#manualForm").hidden = true; S.pendingImage = null; });
+$("#manualForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#manualSave"); btn.disabled = true; $("#manualErr").hidden = true;
+  try {
+    const loc = manualLoc;
+    const out = await api("/api/readings", {
+      method: "POST",
+      body: {
+        sys: $("#mSys").value, dia: $("#mDia").value, pulse: $("#mPul").value,
+        meal: S.meal || null, note: $("#note").value,
+        ...(S.pendingImage ? { image: S.pendingImage.split(",")[1], image_type: "image/jpeg" } : {}),
+        ...(loc ? { lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy } : {}),
+      },
+    });
+    $("#manualForm").hidden = true; S.pendingImage = null;
+    onSaved(out.reading);
+  } catch (er) {
+    if (er.status !== 401) { $("#manualErr").textContent = er.message; $("#manualErr").hidden = false; }
+  } finally { btn.disabled = false; }
+});
+
+function onSaved(r, ocrNote) {
+  S.all.push(r);
+  $("#note").value = "";
+  showResult(r, ocrNote);
+  refreshViews();
+  toast("Ölçüm kaydedildi");
+}
+
+function metaHtml(r, withTime = true) {
+  const parts = [];
+  if (withTime) parts.push(`<span>${icon("i-clock")}${esc(fmt.short(r.created_at))}</span>`);
+  if (r.place) parts.push(`<span>${icon("i-pin")}${esc(r.place)}</span>`);
+  else if (r.lat != null) parts.push(`<span>${icon("i-pin")}${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}</span>`);
+  if (r.temp_c != null) parts.push(`<span>${icon("i-temp")}${esc(fmt.temp(r.temp_c))}${r.weather ? " · " + esc(r.weather) : ""}</span>`);
+  return parts.join("");
+}
+
+function showResult(r, ocrNote) {
+  const el = $("#result");
+  const crisis = isCrisis(r);
+  const notes = [];
+  if (crisis) {
+    notes.push(`<div class="alert critical">${icon("i-alert")}<div><b>Değer acil sınırın üzerinde</b>5 dakika oturup dinlendikten sonra tekrar ölçün. Göğüs ağrısı, nefes darlığı, şiddetli baş ağrısı, görme ya da konuşma bozukluğu, uyuşma varsa hemen 112'yi arayın. Belirti yoksa ve değer yüksek kalıyorsa doktorunuza bugün ulaşın.</div></div>`);
+  } else if (isHigh(r)) {
+    notes.push(`<div class="alert serious">${icon("i-alert")}<div><b>Yüksek ölçüm</b>Sınırınız ${S.settings.warn_sys}/${S.settings.warn_dia}. Tek ölçüm tanı koydurmaz; birkaç dakika sonra tekrar ölçebilirsiniz.</div></div>`);
+  } else if (isLow(r)) {
+    notes.push(`<div class="alert warning">${icon("i-alert")}<div><b>Düşük ölçüm</b>Baş dönmesi veya bayılma hissi varsa oturun ya da uzanın ve doktorunuza danışın.</div></div>`);
+  }
+  if (pulseOff(r)) notes.push(`<div class="alert warning">${icon("i-alert")}<div><b>Nabız ${r.pulse}</b>Normal aralık ${S.settings.pulse_low}–${S.settings.pulse_high}.</div></div>`);
+  if (r.ocr_confidence === "dusuk" || r.ocr_confidence === "orta") {
+    notes.push(`<div class="alert info">${icon("i-info")}<div><b>Değerleri kontrol edin</b>Fotoğraf tam net okunamamış olabilir${ocrNote ? ": " + esc(ocrNote) : "."} Yanlışsa Düzelt'e dokunun.</div></div>`);
+  }
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2>Kaydedildi</h2>${chip(r)}
+    </div>
+    ${lcdHtml(r)}
+    <div class="meta">${metaHtml(r)}${mealLabel(r.meal) ? `<span class="chip plain">${mealLabel(r.meal)}</span>` : ""}</div>
+    ${notes.join("")}
+    <div class="row"><button class="btn" type="button" data-edit="${r.id}">${icon("i-edit")}Düzelt</button></div>`;
+  el.hidden = false;
+  el.querySelector("[data-edit]").addEventListener("click", () => openEdit(r.id));
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function lcdHtml(r) {
+  return `<div class="lcd" aria-label="Büyük ${r.sys}, küçük ${r.dia}, nabız ${r.pulse ?? "yok"}">
+    <div class="k">SYS<small>mmHg</small></div><div class="v">${r.sys}</div>
+    <div class="k">DIA<small>mmHg</small></div><div class="v">${r.dia}</div>
+    <div class="k">PUL<small>/dk</small></div><div class="v pul">${r.pulse ?? "–"}</div>
+  </div>`;
+}
+
+// ------------------------------------------------------------ listeler
+function itemHtml(r) {
+  const thumb = r.has_photo
+    ? `<img class="thumb" loading="lazy" src="${esc(photoSrc(r))}" alt="Fotoğraf" data-photo="${r.id}">`
+    : `<div class="thumb" style="display:grid;place-items:center;color:var(--lcd-dim)">${icon("i-keys")}</div>`;
+  const meal = mealLabel(r.meal);
+  return `<div class="item">
+    ${thumb}
+    <div class="info">
+      <div class="vals">${r.sys}/${r.dia}<small>${r.pulse != null ? "nabız " + r.pulse : ""}</small></div>
+      <div class="row" style="gap:6px">${chip(r)}${meal ? `<span class="chip plain">${meal}</span>` : ""}</div>
+      <div class="meta"><span>${icon("i-clock")}${esc(fmt.time(r.created_at))}</span>${metaHtml(r, false)}</div>
+      ${r.note ? `<div class="small-note">${esc(r.note)}</div>` : ""}
+    </div>
+    <div class="side"><button class="iconbtn" type="button" aria-label="Düzenle" data-edit="${r.id}">${icon("i-edit")}</button></div>
+  </div>`;
+}
+function bindList(el) {
+  for (const b of $$("[data-edit]", el)) b.addEventListener("click", () => openEdit(b.dataset.edit));
+  for (const i of $$("[data-photo]", el)) {
+    i.addEventListener("click", () => openPhoto(i.dataset.photo));
+    i.addEventListener("error", () => retryPhoto(i, i.dataset.photo));
+  }
+}
+function renderToday() {
+  const tk = todayKey();
+  const list = S.all.filter((r) => fmt.dayKey(r.created_at) === tk).reverse();
+  $("#todayCount").textContent = list.length ? `Bugün ${list.length} ölçüm` : "Bugün ölçüm yok";
+  const el = $("#todayList");
+  el.innerHTML = list.length ? list.map(itemHtml).join("") : `<div class="empty">Bugün henüz ölçüm yok. Yukarıdan fotoğraf çekerek ilk ölçümü ekleyin.</div>`;
+  bindList(el);
+}
+function renderAll() {
+  const el = $("#allList");
+  if (!S.all.length) { el.innerHTML = `<div class="panel"><div class="empty">Henüz ölçüm yok. Ölç sekmesinden ilk fotoğrafı çekin.</div></div>`; return; }
+  const groups = new Map();
+  for (const r of S.all.slice().reverse()) {
+    const k = fmt.dayKey(r.created_at);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  let html = "";
+  for (const [, list] of groups) {
+    const a = avg(list.map((r) => r.sys)), b = avg(list.map((r) => r.dia));
+    html += `<div class="day"><h3>${esc(fmt.day(list[0].created_at))} · ${list.length} ölçüm · ort. ${r0(a)}/${r0(b)}</h3>${list.map(itemHtml).join("")}</div>`;
+  }
+  el.innerHTML = html;
+  bindList(el);
+}
+
+// ------------------------------------------------------------ fotoğraf ve düzenleme
+// Notion'daki fotoğraf bağlantıları 1 saat geçerli; açılmazsa sunucudan yenisi istenir.
+const photoSrc = (r) => r.photo_url || `/api/photo/${r.id}`;
+function retryPhoto(img, id) {
+  if (img.dataset.retried) return;
+  img.dataset.retried = "1";
+  img.src = `/api/photo/${id}?t=${Date.now()}`;
+}
+$("#photoImg").addEventListener("error", () => retryPhoto($("#photoImg"), $("#photoImg").dataset.photo));
+function openPhoto(id) {
+  const r = S.all.find((x) => x.id === id);
+  const img = $("#photoImg");
+  delete img.dataset.retried; img.dataset.photo = id;
+  img.src = r ? photoSrc(r) : `/api/photo/${id}`;
+  $("#photoCap").textContent = r ? `${fmt.short(r.created_at)} · ${r.sys}/${r.dia}` : "";
+  $("#photoDlg").showModal();
+}
+$("#photoClose").addEventListener("click", () => $("#photoDlg").close());
+
+function setEditMeal(m) {
+  S.editMeal = m;
+  for (const x of $$("#eMeal button")) x.setAttribute("aria-pressed", String(x.dataset.meal === m));
+}
+for (const b of $$("#eMeal button")) b.addEventListener("click", () => setEditMeal(b.dataset.meal));
+
+function openEdit(id) {
+  const r = S.all.find((x) => x.id === id);
+  if (!r) return;
+  S.editing = r;
+  $("#editWhen").textContent = fmt.short(r.created_at) + (r.place ? " · " + r.place : "");
+  $("#editNotion").hidden = !r.notion_url; if (r.notion_url) $("#editNotion").href = r.notion_url;
+  $("#eSys").value = r.sys; $("#eDia").value = r.dia; $("#ePul").value = r.pulse ?? "";
+  $("#eNote").value = r.note ?? ""; setEditMeal(r.meal || "");
+  $("#editErr").hidden = true; $("#delConfirm").hidden = true; $("#editActions").hidden = false;
+  $("#editDlg").showModal();
+}
+$("#editClose").addEventListener("click", () => $("#editDlg").close());
+$("#editSave").addEventListener("click", async () => {
+  const r = S.editing; if (!r) return;
+  $("#editErr").hidden = true;
+  try {
+    const out = await api(`/api/readings/${r.id}`, { method: "PATCH", body: { sys: $("#eSys").value, dia: $("#eDia").value, pulse: $("#ePul").value, meal: S.editMeal || null, note: $("#eNote").value } });
+    const i = S.all.findIndex((x) => x.id === r.id); if (i >= 0) S.all[i] = out.reading;
+    $("#editDlg").close(); toast("Değişiklik kaydedildi");
+    if (!$("#result").hidden && $("#result [data-edit]")?.dataset.edit == r.id) showResult(out.reading);
+    refreshViews();
+  } catch (e) { if (e.status !== 401) { $("#editErr").textContent = e.message; $("#editErr").hidden = false; } }
+});
+$("#editDel").addEventListener("click", () => { $("#editActions").hidden = true; $("#delConfirm").hidden = false; });
+$("#delNo").addEventListener("click", () => { $("#editActions").hidden = false; $("#delConfirm").hidden = true; });
+$("#delYes").addEventListener("click", async () => {
+  const r = S.editing; if (!r) return;
+  try {
+    await api(`/api/readings/${r.id}`, { method: "DELETE" });
+    S.all = S.all.filter((x) => x.id !== r.id);
+    $("#editDlg").close(); toast("Ölçüm silindi");
+    if ($("#result [data-edit]")?.dataset.edit == r.id) $("#result").hidden = true;
+    refreshViews();
+  } catch (e) { if (e.status !== 401) { $("#editErr").textContent = e.message; $("#editErr").hidden = false; } }
+});
+
+// ------------------------------------------------------------ rapor
+for (const b of $$(".periods button")) {
+  b.addEventListener("click", () => {
+    S.days = Number(b.dataset.days);
+    try { localStorage.setItem("tt_days", String(S.days)); } catch {}
+    filterPeriod(); renderReport();
+  });
+}
+
+function computeAlerts(R) {
+  const s = S.settings, out = [];
+  if (!R.length) return [{ tone: "info", title: "Bu dönemde ölçüm yok", text: "Ölç sekmesinden fotoğraf çekerek ölçüm ekleyin." }];
+  const last = (arr) => arr[arr.length - 1];
+
+  const crisis = R.filter(isCrisis);
+  if (crisis.length) {
+    const l = last(crisis);
+    out.push({ tone: "critical", title: `${crisis.length} ölçüm acil sınırın üzerinde (${s.crisis_sys}/${s.crisis_dia})`,
+      text: `En son ${fmt.short(l.created_at)}: ${l.sys}/${l.dia}. Bu değerleri doktorunuzla paylaşın.` });
+  }
+  const aS = avg(R.map((r) => r.sys)), aD = avg(R.map((r) => r.dia));
+  if (R.length >= 3 && (aS >= s.warn_sys || aD >= s.warn_dia)) {
+    out.push({ tone: "serious", title: `Dönem ortalaması yüksek: ${r0(aS)}/${r0(aD)}`, text: `Ortalama, ${s.warn_sys}/${s.warn_dia} sınırının üzerinde. Ev ölçümlerinde ortalamanın yüksek olması doktorunuzla görüşülmesi gereken bir durumdur.` });
+  }
+  const high = R.filter((r) => isHigh(r) && !isCrisis(r));
+  if (high.length) {
+    out.push({ tone: "warning", title: `${R.length} ölçümün ${high.length} tanesi yüksek (%${Math.round((high.length / R.length) * 100)})`, text: `${s.warn_sys}/${s.warn_dia} ve üzeri ölçümler.` });
+  }
+  const low = R.filter(isLow);
+  if (low.length) {
+    const l = last(low);
+    out.push({ tone: "warning", title: `${low.length} düşük ölçüm`, text: `${s.low_sys}/${s.low_dia} altında. En son ${fmt.short(l.created_at)}: ${l.sys}/${l.dia}.` });
+  }
+  const pul = R.filter(pulseOff);
+  if (pul.length) {
+    out.push({ tone: "warning", title: `${pul.length} ölçümde nabız aralık dışında`, text: `Normal kabul edilen aralık ${s.pulse_low}–${s.pulse_high}/dk.` });
+  }
+  // son 7 gün ile önceki 7 gün
+  const now = Date.now();
+  const w1 = S.all.filter((r) => now - new Date(r.created_at) < 7 * 86400e3);
+  const w0 = S.all.filter((r) => { const d = now - new Date(r.created_at); return d >= 7 * 86400e3 && d < 14 * 86400e3; });
+  if (w1.length >= 3 && w0.length >= 3) {
+    const d = avg(w1.map((r) => r.sys)) - avg(w0.map((r) => r.sys));
+    if (d >= 5) out.push({ tone: "warning", title: `Büyük tansiyon yükseliyor (+${Math.round(d)} mmHg)`, text: "Son 7 günün ortalaması önceki 7 güne göre yüksek." });
+    else if (d <= -5) out.push({ tone: "good", title: `Büyük tansiyon düşüyor (${Math.round(d)} mmHg)`, text: "Son 7 günün ortalaması önceki 7 güne göre düşük." });
+  }
+  const ac = R.filter((r) => r.meal === "ac"), tok = R.filter((r) => r.meal === "tok");
+  if (ac.length >= 2 && tok.length >= 2) {
+    const d = avg(tok.map((r) => r.sys)) - avg(ac.map((r) => r.sys));
+    if (Math.abs(d) >= 10) out.push({ tone: "info", title: `Tok ölçümler aç ölçümlerden ${Math.abs(Math.round(d))} mmHg ${d > 0 ? "yüksek" : "düşük"}`, text: "Aç ve tok ölçümleriniz arasında belirgin fark var." });
+  }
+  const tk = todayKey();
+  if (!S.all.some((r) => fmt.dayKey(r.created_at) === tk)) out.push({ tone: "info", title: "Bugün henüz ölçüm yapılmadı", text: "" });
+  if (!out.some((a) => a.tone !== "info")) out.unshift({ tone: "good", title: "Bu dönemde uyarı yok", text: `Tüm ölçümler sınırlarınız içinde (ortalama ${r0(aS)}/${r0(aD)}).` });
+  return out;
+}
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function chartBase() {
+  const ink = css("--ink-2"), grid = css("--grid"), muted = css("--muted");
+  Chart.defaults.font.family = css("--font-body");
+  Chart.defaults.color = ink;
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: css("--ink"), titleColor: css("--bg"), bodyColor: css("--bg"), padding: 10, boxPadding: 4, usePointStyle: true },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: grid }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 5 } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 6 } },
+    },
+  };
+}
+
+function drawChart(id, config) {
+  if (S.charts[id]) S.charts[id].destroy();
+  S.charts[id] = new Chart(document.getElementById(id), config);
+}
+
+function renderReport() {
+  if (!S.settings) return;
+  for (const b of $$(".periods button")) b.setAttribute("aria-pressed", String(Number(b.dataset.days) === S.days));
+  const R = S.readings, s = S.settings;
+
+  $("#alerts").innerHTML = computeAlerts(R).map((a) => {
+    const ic = a.tone === "good" ? "i-ok" : a.tone === "info" ? "i-info" : "i-alert";
+    return `<div class="alert ${a.tone}">${icon(ic)}<div><b>${esc(a.title)}</b>${esc(a.text)}</div></div>`;
+  }).join("");
+
+  const aS = avg(R.map((r) => r.sys)), aD = avg(R.map((r) => r.dia));
+  const P = R.filter((r) => r.pulse != null);
+  const max = R.reduce((m, r) => (!m || r.sys > m.sys ? r : m), null);
+  const days = new Set(R.map((r) => fmt.dayKey(r.created_at))).size;
+  $("#tiles").innerHTML = `
+    <div class="tile"><div class="d">Ortalama</div><div class="n">${r0(aS)}/${r0(aD)} <small>mmHg</small></div></div>
+    <div class="tile"><div class="d">Ortalama nabız</div><div class="n">${r0(avg(P.map((r) => r.pulse)))} <small>/dk</small></div></div>
+    <div class="tile"><div class="d">En yüksek</div><div class="n">${max ? max.sys + "/" + max.dia : "–"}</div><div class="d">${max ? esc(fmt.short(max.created_at)) : ""}</div></div>
+    <div class="tile"><div class="d">Ölçüm</div><div class="n">${R.length} <small>${days} günde</small></div></div>`;
+
+  const sys = css("--sys"), dia = css("--dia"), pulse = css("--pulse"), muted = css("--muted"), surface = css("--surface");
+  $("#bpLegend").innerHTML = `<span><i style="background:${sys}"></i>Büyük (SYS)</span><span><i style="background:${dia}"></i>Küçük (DIA)</span><span><i class="dash"></i>Sınır ${s.warn_sys}/${s.warn_dia}</span>`;
+
+  // eksende yalnız gün, ipucunda gün ve saat
+  const labels = R.map((r) => fmt.dayShort(r.created_at));
+  const titleCb = { title: (items) => fmt.short(R[items[0].dataIndex].created_at) };
+  const line = (data, color, label) => ({
+    label, data, borderColor: color, backgroundColor: color, borderWidth: 2, tension: 0.25,
+    pointRadius: R.length > 60 ? 0 : 3.5, pointHoverRadius: 6, pointBorderColor: surface, pointBorderWidth: 1.5, spanGaps: true,
+  });
+  const limit = (v, label) => ({
+    label, data: R.map(() => v), borderColor: muted, borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 0, fill: false,
+  });
+  const base = chartBase();
+  const tipFilter = { filter: (item) => !item.dataset.label.startsWith("Sınır") };
+
+  drawChart("cBp", {
+    type: "line",
+    data: { labels, datasets: [line(R.map((r) => r.sys), sys, "Büyük"), line(R.map((r) => r.dia), dia, "Küçük"), limit(s.warn_sys, "Sınır büyük"), limit(s.warn_dia, "Sınır küçük")] },
+    options: { ...base, plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, ...tipFilter, callbacks: { ...titleCb, afterBody: (items) => { const r = R[items[0].dataIndex]; const m = [mealLabel(r.meal), r.place, fmt.temp(r.temp_c)].filter(Boolean); return m.length ? m.join(" · ") : ""; } } } },
+      scales: { ...base.scales, y: { ...base.scales.y, suggestedMin: 50, suggestedMax: 160, title: { display: true, text: "mmHg", color: muted } } } },
+  });
+
+  drawChart("cPulse", {
+    type: "line",
+    data: { labels, datasets: [line(R.map((r) => r.pulse), pulse, "Nabız")] },
+    options: { ...base, plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, callbacks: titleCb } }, scales: { ...base.scales, y: { ...base.scales.y, suggestedMin: 50, suggestedMax: 100, title: { display: true, text: "atım/dk", color: muted } } } },
+  });
+
+  // sınıf dağılımı
+  const counts = CLASSES.map((c) => ({ c, n: R.filter((r) => classify(r).key === c.key).length })).filter((x) => x.n || x.c.key !== "dusuk");
+  const maxN = Math.max(1, ...counts.map((x) => x.n));
+  $("#dist").innerHTML = R.length ? counts.map(({ c, n }) =>
+    `<div class="r"><span>${esc(c.name)}</span><div class="bar"><b style="width:${(n / maxN) * 100}%;background:var(--${c.tone})"></b></div><span class="c">${n}</span></div>`).join("")
+    : `<div class="empty">Bu dönemde ölçüm yok.</div>`;
+
+  // gruplu çubuklar
+  const groupChart = (id, groups) => {
+    const has = groups.filter((g) => g.items.length);
+    drawChart(id, {
+      type: "bar",
+      data: {
+        labels: has.map((g) => `${g.name} (${g.items.length})`),
+        datasets: [
+          { label: "Büyük", data: has.map((g) => Math.round(avg(g.items.map((r) => r.sys)))), backgroundColor: sys, borderRadius: 4, borderSkipped: "start", maxBarThickness: 36 },
+          { label: "Küçük", data: has.map((g) => Math.round(avg(g.items.map((r) => r.dia)))), backgroundColor: dia, borderRadius: 4, borderSkipped: "start", maxBarThickness: 36 },
+        ],
+      },
+      options: { ...base, interaction: { mode: "index", intersect: false }, scales: { ...base.scales, y: { ...base.scales.y, beginAtZero: true } } },
+    });
+  };
+  groupChart("cMeal", [
+    { name: "Aç", items: R.filter((r) => r.meal === "ac") },
+    { name: "Tok", items: R.filter((r) => r.meal === "tok") },
+    { name: "Belirtilmemiş", items: R.filter((r) => !r.meal) },
+  ]);
+  const part = (r) => { const h = fmt.hour(r.created_at); return h >= 5 && h < 11 ? 0 : h >= 11 && h < 17 ? 1 : h >= 17 && h < 23 ? 2 : 3; };
+  groupChart("cTod", ["Sabah", "Öğle", "Akşam", "Gece"].map((name, i) => ({ name, items: R.filter((r) => part(r) === i) })));
+
+  const T = R.filter((r) => r.temp_c != null);
+  $("#tempSub").textContent = T.length ? `Her nokta bir ölçüm (${T.length} ölçümde sıcaklık bilgisi var).` : "Sıcaklık bilgisi olan ölçüm yok. Konum izni verildiğinde dış sıcaklık otomatik kaydedilir.";
+  drawChart("cTemp", {
+    type: "scatter",
+    data: { datasets: [{ label: "Büyük tansiyon", data: T.map((r) => ({ x: r.temp_c, y: r.sys, r })), backgroundColor: sys, pointRadius: 5, pointHoverRadius: 7, pointBorderColor: surface, pointBorderWidth: 1.5 }] },
+    options: { ...base, interaction: { mode: "nearest", intersect: true },
+      plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, callbacks: { label: (c) => `${c.raw.r.sys}/${c.raw.r.dia} · ${fmt.temp(c.raw.x)} · ${fmt.short(c.raw.r.created_at)}` } } },
+      scales: { x: { ...base.scales.x, type: "linear", grid: { color: css("--grid") }, title: { display: true, text: "Dış sıcaklık (°C)", color: muted } }, y: { ...base.scales.y, title: { display: true, text: "Büyük (mmHg)", color: muted } } } },
+  });
+}
+
+// tema değişince grafikleri yeniden çiz
+const mq = matchMedia("(prefers-color-scheme: dark)");
+(mq.addEventListener ? mq.addEventListener.bind(mq, "change") : mq.addListener.bind(mq))(() => { if (S.view === "rapor") renderReport(); });
+
+// ------------------------------------------------------------ ayarlar
+const SKEYS = ["warn_sys", "warn_dia", "crisis_sys", "crisis_dia", "low_sys", "low_dia", "pulse_high", "pulse_low"];
+function fillSettings() { for (const k of SKEYS) $("#s_" + k).value = S.settings[k]; }
+$("#settingsForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#settingsErr").hidden = true;
+  const body = {}; for (const k of SKEYS) body[k] = $("#s_" + k).value;
+  try { const out = await api("/api/settings", { method: "PUT", body }); S.settings = out.settings; toast("Sınırlar kaydedildi"); refreshViews(); }
+  catch (er) { if (er.status !== 401) { $("#settingsErr").textContent = er.message; $("#settingsErr").hidden = false; } }
+});
+
+// ------------------------------------------------------------ açılış
+async function boot() {
+  const me = await api("/api/me");
+  S.tz = me.timezone; S.settings = me.settings; S.ocr = me.ocr;
+  $("#ocrStatus").textContent = me.ocr ? "Fotoğraftan okuma etkin." : "Fotoğraftan okuma kapalı: sunucuda ANTHROPIC_API_KEY tanımlı değil. Fotoğraf yine kaydedilir, değerleri elle girersiniz.";
+  $("#login").hidden = true; $("#app").hidden = false;
+  await loadAll();
+  renderToday();
+  const hash = location.hash.replace("#", "");
+  setView(["olc", "rapor", "kayit", "ayar"].includes(hash) ? hash : "olc");
+}
+boot().catch((e) => { if (e.status !== 401) { document.body.insertAdjacentHTML("afterbegin", `<div class="wrap" style="padding-block:24px"><div class="alert critical">${icon("i-alert")}<div><b>Uygulama açılamadı</b>${esc(e.message)}</div></div></div>`); } });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  // Tansiyon Takip — Cloudflare Workers yapılandırması
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tansiyon-takip",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+
+  // Arayüz dosyaları (public/). /api/* istekleri önce worker'a gider.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Ölçümlerin saklandığı D1 veritabanı.
+  // "npx wrangler d1 create tansiyon" komutunun verdiği database_id'yi aşağıya yapıştırın.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tansiyon",
+      "database_id": "BURAYA_DATABASE_ID_YAPISTIRIN"
+    }
+  ],
+
+  "vars": {
+    // Fotoğraftaki değerleri okuyan Claude modeli. Daha ucuz seçenek: "claude-haiku-5-5"
+    "CLAUDE_MODEL": "claude-sonnet-5-5",
+    // Tarih/saat gösterimi ve sabah/akşam gruplaması için saat dilimi
+    "TIMEZONE": "Europe/Istanbul"
+  },
+
+  // Gizli değerler (kodda yazılı değildir, komut satırından girilir):
+  //   npx wrangler secret put APP_PASSWORD        -> uygulamaya giriş şifresi
+  //   npx wrangler secret put ANTHROPIC_API_KEY   -> console.anthropic.com'dan alınan API anahtarı
+
+  "observability": { "enabled": true }
+}
